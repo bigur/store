@@ -141,7 +141,7 @@ class Stored(AttrDict, metaclass=MetadataType):
 
     @classmethod
     async def remove(cls, *args, **kwargs):
-        return await cls.get_collection().remove(*args, **kwargs)
+        return await cls.get_collection().delete_one(*args, **kwargs)
 
     async def save(self):
         '''Сохраняет объект в базе данных. Если объект уже был создан,
