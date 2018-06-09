@@ -177,6 +177,9 @@ class Stored(AttrDict, metaclass=MetadataType):
         elif isinstance(obj, (str, int, float, bool, bytes)):
             pickled = obj
 
+        elif isinstance(obj, LazyRef):
+            pickled = obj._dbref
+
         elif hasattr(obj, '__iter__'):
             with_keys = hasattr(obj, '__getitem__')
             if with_keys:
