@@ -1,9 +1,6 @@
 # Файлы python
 *.pyc
 __pycache__
-<<<<<<< HEAD
 
 # Файлы egg-info
 /bigur_store.egg-info
-=======
->>>>>>> c175721062bb6382a5965587892b5b2decc105af
