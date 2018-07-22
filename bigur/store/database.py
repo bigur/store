@@ -9,8 +9,7 @@ from urllib.parse import urlparse
 from motor.core import AgnosticBaseProperties
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCursor, AsyncIOMotorDatabase, AsyncIOMotorCollection
 
-from bigur.config import config
-from bigur.utils import class_by_name
+from bigur.utils import class_by_name, config
 
 
 def compile_object(document):

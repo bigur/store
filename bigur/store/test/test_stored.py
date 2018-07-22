@@ -6,14 +6,14 @@ __author__ = 'Gennady Kovalev <gik@bigur.ru>'
 __copyright__ = '(c) 2016-2017 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
-import asyncio
-import unittest
+from asyncio import get_event_loop
+from unittest import TestCase
 
-import office
-import office.stored
+from bigur.store import Stored, LazyRef
+from bigur.store import db
 
 
-class Person(office.stored.Stored):
+class Person(Stored):
     '''Люди.'''
     __metadata__ = {
         'collection': 'persons'
@@ -36,7 +36,7 @@ class Woman(Person):
     pass
 
 
-class Address(office.stored.Stored):
+class Address(Stored):
     '''Адрес.'''
 
     def __init__(self, street, house, flat):
@@ -49,17 +49,17 @@ class Address(office.stored.Stored):
         return '{}, {}, {}'.format(self.street, self.house, self.flat)
 
 
-class TestStored(unittest.TestCase):
+class TestStored(TestCase):
     '''Тестирование хранения лобъектов в БД.'''
 
     def setUp(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = get_event_loop()
 
     def tearDown(self):
-        self.loop.run_until_complete(office.World().db.client.drop_database('test'))
+        self.loop.run_until_complete(db.client.drop_database(db.name))
 
     def test_create_object(self):
-        '''Stored: создание и сохранение объекта'''
+        '''Cоздание и сохранение объекта'''
         async def save(): #pylint: disable=missing-docstring
             man = Man(name='Иван')
             await man.save()
@@ -69,7 +69,7 @@ class TestStored(unittest.TestCase):
         self.loop.run_until_complete(save())
 
     def test_edit_object(self):
-        '''Stored: изменение объекта'''
+        '''Изменение объекта'''
         async def edit(): #pylint: disable=missing-docstring
             man = Man(name='Иван')
             await man.save()
@@ -81,7 +81,7 @@ class TestStored(unittest.TestCase):
         self.loop.run_until_complete(edit())
 
     def test_lazy_ref(self):
-        '''Stored: ленивая ссылка'''
+        '''Ленивая ссылка'''
         async def ref(): #pylint: disable=missing-docstring
             address = Address('Тверская ул.', 14, 5)
             await address.save()
@@ -90,14 +90,14 @@ class TestStored(unittest.TestCase):
             await man.save()
 
             newman = await Man.find_one({'_id': man.id})
-            self.assertTrue(isinstance(newman.address, office.stored.LazyRef))
+            self.assertTrue(isinstance(newman.address, LazyRef))
 
             newman.address = await newman.address.resolve()
             self.assertEqual(newman.address.full(), 'Тверская ул., 14, 5')
         self.loop.run_until_complete(ref())
 
     def test_get_list(self):
-        '''Stored: получение списка объектов'''
+        '''Получение списка объектов'''
         async def get_list(): #pylint: disable=missing-docstring
             ivan = await Man(name='Иван', order=1).save()
             maria = await Woman(name='Марья', order=2).save()
