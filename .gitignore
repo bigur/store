@@ -1,0 +1,6 @@
+# Файлы python
+*.pyc
+__pycache__
+
+# Файлы egg-info
+/bigur_store.egg-info

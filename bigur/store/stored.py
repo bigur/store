@@ -11,7 +11,7 @@ from bson.dbref import DBRef
 
 from bigur.utils import AttrDict
 
-from .database import db, DBProxy
+from .database import DBProxy, db
 
 
 class IntegrityError(Exception):
