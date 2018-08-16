@@ -6,10 +6,11 @@ __licence__ = 'For license information see LICENSE'
 
 from uuid import uuid4
 from datetime import datetime, timezone
+from warnings import warn
 
 from bson.dbref import DBRef
 
-from bigur.utils import AttrDict
+from bigur.utils import class_by_name
 
 from .database import DBProxy, db
 
@@ -85,13 +86,137 @@ class MetadataType(type):
         cls.__metadata__ = metadata
 
 
-class Stored(AttrDict, metaclass=MetadataType):
-
+class DatabaseDocument(metaclass=MetadataType):
     __metadata__ = {
-        'collection': None,
         'include_attrs': ['_id'],
         'exclude_attrs': ['_saved'],
         'replace_attrs': {},
+    }
+
+    @classmethod
+    def _pickle(cls, obj):
+        if isinstance(obj, (str, int, float, bool, bytes)):
+            pickled = obj
+
+        elif isinstance(obj, list):
+            pickled = []
+            for value in obj:
+                pickled.append(cls._pickle(value))
+
+        elif isinstance(obj, dict):
+            pickled = {}
+            for key in iter(obj):
+                pickled[key] = cls._pickle(obj[key])
+
+        elif isinstance(obj, LazyRef):
+            pickled = obj._dbref
+
+        elif isinstance(obj, Embedded):
+            pickled = obj.__getstate__()
+
+        elif isinstance(obj, Stored):
+            collection = type(obj).get_collection().name
+            pickled = DBRef(collection, obj.id)
+
+        elif hasattr(obj, '__iter__'):
+            warn(
+                'сохранение типа с __iter__ не будет поддерживаться, '
+                'используйте специальные классы Embedded и Stored.',
+                DeprecationWarning,
+                stacklevel=2
+            )
+            with_keys = hasattr(obj, '__getitem__')
+            if with_keys:
+                pickled = {}
+            else:
+                pickled = []
+            for key in iter(obj):
+                if with_keys:
+                    pickled[key] = cls._pickle(obj[key])
+                else:
+                    pickled.append(cls._pickle(obj[key]))
+
+        else:
+            pickled = obj
+
+        return pickled
+
+    @classmethod
+    def _unpickle(cls, obj):
+        unpickled = obj
+
+        if isinstance(obj, datetime) and obj.tzinfo is None:
+            unpickled = obj.replace(tzinfo=timezone.utc)
+
+        elif isinstance(obj, list):
+            unpickled = []
+            for value in obj:
+                unpickled.append(cls._unpickle(value))
+
+        elif isinstance(obj, dict) and '_class' in obj:
+            cls = class_by_name(obj['_class'])
+            unpickled = cls.__new__(cls)
+            unpickled.__setstate__(obj)
+
+        elif isinstance(obj, dict):
+            unpickled = {}
+            for key, value in obj.items():
+                unpickled[key] = cls._unpickle(value)
+
+        elif isinstance(obj, DBRef):
+            unpickled = LazyRef(obj)
+
+        return unpickled
+
+    def __getstate__(self):
+        metadata = type(self).__metadata__
+        include = metadata.get('include_attrs', [])
+        exclude = metadata.get('exclude_attrs', [])
+        replace = metadata.get('replace_attrs', {})
+        picklers = metadata.get('picklers', {})
+
+        cls = type(self)
+        state = {'_class': '{}.{}'.format(cls.__module__, cls.__name__)}
+        for attr in self.__dict__:
+            key = attr
+            if key in replace:
+                key = replace[key]
+            if key.startswith('_') and key not in include and key != '_id':
+                continue
+            elif key in exclude:
+                continue
+            if attr in picklers:
+                value = picklers[attr]['pickle'](self, getattr(self, attr))
+            else:
+                value = self._pickle(getattr(self, attr))
+            if value is not None:
+                state[key] = value
+        return state
+
+    def __setstate__(self, data, recurse=True):
+        replace = self.__metadata__.get('replace_attrs', {})
+        replaced = dict([(v, k) for k, v in replace.items()])
+        picklers = self.__metadata__.get('picklers', {})
+
+        state = {'_saved': True}
+        for key, value in data.items():
+            if key in replaced:
+                key = replaced[key]
+            if key in picklers:
+                state[key] = picklers[key]['unpickle'](self, state, value)
+            else:
+                state[key] = self._unpickle(value)
+
+        self.__dict__.update(state)
+
+
+class Embedded(DatabaseDocument):
+    pass
+
+
+class Stored(DatabaseDocument):
+    __metadata__ = {
+        'collection': None,
     }
 
     __events__ = ['created', 'changed', 'deleted']
@@ -152,8 +277,8 @@ class Stored(AttrDict, metaclass=MetadataType):
             self._saved = True
         else:
             unset = {}
-            for attr in self:
-                value = self[attr]
+            for attr in self.__dict__:
+                value = getattr(self, attr)
                 if value is None:
                     unset[attr] = None
             if unset:
@@ -162,102 +287,6 @@ class Stored(AttrDict, metaclass=MetadataType):
                 query = {'$set': state}
             await self.update_one({'_id': self._id}, query)
         return self
-
-    @classmethod
-    def _pickle(cls, obj):
-        if isinstance(obj, list):
-            pickled = []
-            for value in obj:
-                pickled.append(cls._pickle(value))
-
-        elif isinstance(obj, Stored):
-            collection = type(obj).get_collection().name
-            pickled = DBRef(collection, obj.id)
-
-        elif isinstance(obj, (str, int, float, bool, bytes)):
-            pickled = obj
-
-        elif isinstance(obj, LazyRef):
-            pickled = obj._dbref
-
-        elif hasattr(obj, '__iter__'):
-            with_keys = hasattr(obj, '__getitem__')
-            if with_keys:
-                pickled = {}
-            else:
-                pickled = []
-            for key in iter(obj):
-                if with_keys:
-                    pickled[key] = cls._pickle(obj[key])
-                else:
-                    pickled.append(cls._pickle(obj[key]))
-        else:
-            pickled = obj
-
-        return pickled
-
-    @classmethod
-    def _unpickle(cls, obj):
-        unpickled = obj
-
-        if isinstance(obj, DBRef):
-            unpickled = LazyRef(obj)
-
-        elif isinstance(obj, datetime):
-            unpickled = obj.replace(tzinfo=timezone.utc)
-
-        elif isinstance(obj, list):
-            unpickled = []
-            for value in obj:
-                unpickled.append(cls._unpickle(value))
-
-        elif isinstance(obj, dict):
-            unpickled = {}
-            for key, value in obj.items():
-                unpickled[key] = cls._unpickle(value)
-
-        return unpickled
-
-    def __getstate__(self):
-        metadata = type(self).__metadata__
-        include = metadata.get('include_attrs', [])
-        exclude = metadata.get('exclude_attrs', [])
-        replace = metadata.get('replace_attrs', {})
-        picklers = metadata.get('picklers', {})
-
-        cls = type(self)
-        state = {'_class': '{}.{}'.format(cls.__module__, cls.__name__)}
-        for attr in self:
-            key = attr
-            if key in replace:
-                key = replace[key]
-            if key.startswith('_') and key not in include and key != '_id':
-                continue
-            elif key in exclude:
-                continue
-            if attr in picklers:
-                value = picklers[attr]['pickle'](self, self[attr])
-            else:
-                value = self._pickle(self[attr])
-            if value is not None:
-                state[key] = value
-        return state
-
-    def __setstate__(self, data, recurse=True):
-        replace = self.__metadata__.get('replace_attrs', {})
-        replaced = dict([(v, k) for k, v in replace.items()])
-        picklers = self.__metadata__.get('picklers', {})
-
-        state = {'_saved': True}
-        for key, value in data.items():
-            if key in replaced:
-                key = replaced[key]
-            if key in picklers:
-                state[key] = picklers[key]['unpickle'](self, state, value)
-            else:
-                state[key] = self._unpickle(value)
-
-        self.__dict__.update(state)
 
     def __str__(self):
         return '{}(\'{}\')'.format(self.__class__.__name__, self._id)

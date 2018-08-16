@@ -9,7 +9,7 @@ __licence__ = 'For license information see LICENSE'
 from asyncio import get_event_loop
 from unittest import TestCase
 
-from bigur.store import Stored, LazyRef
+from bigur.store import Embedded, Stored, LazyRef
 from bigur.store import db
 
 
@@ -49,8 +49,21 @@ class Address(Stored):
         return '{}, {}, {}'.format(self.street, self.house, self.flat)
 
 
+class Sender(Embedded):
+    def __init__(self, name: str, address: str):
+        self.name = name
+        self.address = address
+
+
+class Letter(Stored):
+    def __init__(self, sender: Sender):
+        self.sender = sender
+        super().__init__()
+
+
+
 class TestStored(TestCase):
-    '''Тестирование хранения лобъектов в БД.'''
+    '''Тестирование хранения объектов в БД.'''
 
     def setUp(self):
         self.loop = get_event_loop()
@@ -109,3 +122,14 @@ class TestStored(TestCase):
             self.assertEqual([ivan.id, maria.id], [x.id for x in people])
 
         self.loop.run_until_complete(get_list())
+
+    def test_save_embedded(self):
+        '''Сохранение встроенного документа'''
+        async def get_embedded():
+            letter = await Letter(sender=Sender('Иван', 'Москва')).save()
+            letter = await Letter.find_one({'_id': letter.id})
+            self.assertTrue(isinstance(letter.sender, Embedded))
+            self.assertEqual(letter.sender.name, 'Иван')
+            self.assertEqual(letter.sender.address, 'Москва')
+
+        self.loop.run_until_complete(get_embedded())
