@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
-
-'''Модуль для тестирования хранения объектов.'''
+'''Тестирование документа.'''
 
 __author__ = 'Gennady Kovalev <gik@bigur.ru>'
-__copyright__ = '(c) 2016-2017 Business group for development management'
+__copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
 from asyncio import get_event_loop
@@ -45,21 +43,20 @@ class Address(Stored):
         self.flat = flat
         super().__init__()
 
-    def full(self): # pylint: disable=missing-docstring
+    def full(self) -> str: # pylint: disable=missing-docstring
         return '{}, {}, {}'.format(self.street, self.house, self.flat)
 
 
 class Sender(Embedded):
-    def __init__(self, name: str, address: str):
+    def __init__(self, name: str, address: str) -> None:
         self.name = name
         self.address = address
 
 
 class Letter(Stored):
-    def __init__(self, sender: Sender):
+    def __init__(self, sender: Sender) -> None:
         self.sender = sender
         super().__init__()
-
 
 
 class TestStored(TestCase):
