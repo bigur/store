@@ -2,5 +2,11 @@
 *.pyc
 __pycache__
 
+# Кеш mypy
+/.mypy_cache
+
 # Файлы egg-info
 /bigur_store.egg-info
+
+# Тесты
+/.pytest_cache
