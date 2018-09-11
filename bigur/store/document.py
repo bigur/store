@@ -64,7 +64,7 @@ def unpickle(obj: Any) -> Any:
         unpickled = obj.replace(tzinfo=timezone.utc)
 
     elif isinstance(obj, list):
-        unpickled = List
+        unpickled = EmbeddedList
         for value in obj:
             unpickled.append(unpickle(value))
 
@@ -94,13 +94,26 @@ def unpickle(obj: Any) -> Any:
 class Node(object):
     '''Узел для поддержки вложенности документов.'''
     def __init__(self) -> None:
+        logger.debug('Node.__init__ (%s) start', self)
         self.__node_parent__: Optional[Document] = None
         self.__node_name__: Optional[str] = None
         super().__init__()
+        logger.debug('Node.__init__ (%s) end', self)
+
+    def mark_dirty(self, keys: Set[str]) -> None:
+        parent = getattr(self, '__node_parent__', None)
+        if parent is not None:
+            name = self.__node_name__
+            parent_keys = {'{}.{}'.format(name, x) for x in keys}
+            parent.mark_dirty(parent_keys)
 
 
-class List(Node, list):
+class EmbeddedList(Node, list):
     '''Список, который является свойством документа БД.'''
+
+
+class EmbeddedDict(Node, dict):
+    '''Словарь, который является свойством документа БД.'''
 
 
 class Document(DocumentType, Node):
@@ -150,37 +163,39 @@ class Document(DocumentType, Node):
 
     # Установка атрибутов
     def __setattr__(self, key: str, value: Any) -> None:
+        logger.debug('Document.__setattr__ (%s) set %s=%s', self, key, value)
+
         super().__setattr__(key, value)
+
         if key not in ('__node_parent__', '__node_name__'):
             if isinstance(value, Node):
                 value.__node_parent__ = self
                 value.__node_name__ = key
 
+            parent = getattr(self, '__node_parent__', None)
+            if parent:
+                parent.mark_dirty({'{}.{}'.format(self.__node_name__, key)})
+
 
 class Embedded(Document):
     '''Объект, который является встроенным документом в другой.'''
-
-    #def __setattr__(self, key: str, value: Any):
-    #    super().__setattr__(key, value)
-    #    parent = getattr(self, '__node_parent__', None)
-    #    if parent:
-    #        parent._mark_dirty({'{}.{}'.format(self.__node_name__, key)})
 
 
 class Stored(Document):
     '''Объект, который сохраняется в базу данных.'''
 
     def __init__(self, id_: Optional[Id] = None) -> None:
-
+        logger.debug('Stored.__init__ (%s) start', self)
         if id_ is None:
             id_ = Id(str(uuid4()))
         self._id: Id = id_
 
-        self._mark_new()
+        self.mark_new()
 
         self.__unit_of_work = context.get()
 
         super().__init__()
+        logger.debug('Stored.__init__ (%s) end', self)
 
     @property
     def id(self): # pylint: disable=invalid-name
@@ -189,12 +204,14 @@ class Stored(Document):
 
     # Установка атрибутов
     def __setattr__(self, key: str, value: Any):
+        logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
         if key != '__unit_of_work' and hasattr(self, '__unit_of_work'):
-            self._mark_dirty(keys={key})
+            self.mark_dirty(keys={key})
 
     # Регистрация объектов в UnitOfWork
-    def _mark_new(self) -> None:
+    def mark_new(self) -> None:
+        '''Помечает объект как новый в единице работы.'''
         uow = context.get()
         if uow is not None:
             logger.debug('Помечаю объект %s как новый', self)
@@ -202,7 +219,8 @@ class Stored(Document):
         else:
             logger.warning('Создаю объект вне контекста БД.', stack_info=True)
 
-    def _mark_dirty(self, keys: Set[str]) -> None:
+    def mark_dirty(self, keys: Set[str]) -> None:
+        '''Помечает объект как изменённый в единице работы.'''
         if getattr(self, '_id', None) is not None:
             logger.debug(
                 'Помечаю объект %s как грязный, атрибуты %s',
@@ -215,8 +233,8 @@ class Stored(Document):
             else:
                 logger.warning('Изменяю объект вне контекста БД.', stack_info=True)
 
-    def _mark_removed(self) -> None:
-        pass
+    def mark_removed(self) -> None:
+        '''Помечает объект как удалённый в единице работы.'''
 
     # Коллекция
     @classmethod

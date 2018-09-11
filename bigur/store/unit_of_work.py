@@ -26,7 +26,10 @@ class UnitOfWork(object):
 
         super().__init__()
 
+    # Управление очередями
     def register_new(self, document: Document) -> None:
+        '''Ставит документ в очередь для создания в БД.'''
+
         id_ = document.id
         if not id_:
             raise ValueError('Документ должен содержать ИД.')
@@ -37,6 +40,8 @@ class UnitOfWork(object):
         self._new[id_] = document
 
     def register_dirty(self, document: Document, keys: Set[str]) -> None:
+        '''Ставит документ в очередь для обновления.'''
+
         id_ = document.id
         if not id_:
             raise ValueError('Документ должен содержать ИД.')
@@ -49,28 +54,49 @@ class UnitOfWork(object):
                 self._dirty[id_] = (document, keys)
 
     def register_removed(self, document: Document) -> None:
-        pass
+        '''Ставит документ в очередь для удаления из БД.'''
 
+        id_ = document.id
+        if id_ in self._new:
+            del self._new[id_]
+        else:
+            if id_ in self._dirty:
+                del self._dirty[id_]
+            if id_ not in self._removed:
+                self._removed[id_] = document
+
+    # Сохранение изменений в БД
     async def insert_new(self) -> None:
         '''Создаёт новые документы в базе данных.'''
+
         for document in self._new.values():
             await type(document).insert_one(document)
 
     async def update_dirty(self) -> None:
+        '''Обновляет документы в базе данных.'''
         for document, attrs in self._dirty.values():
             await type(document).update_one(document, attrs)
 
     async def delete_removed(self) -> None:
-        pass
+        '''Удаляет документы из базы данных.'''
+        for document in self._new.values():
+            await type(document).delete_one(document)
 
+    # Управление транзакцией
     async def commit(self) -> None:
+        '''Сохраняет все запланированные изменения в БД.'''
         await self.insert_new()
         await self.update_dirty()
         await self.delete_removed()
 
     async def rollback(self) -> None:
-        pass
+        '''Отменяет все изменения в текущей единице работы. Сами объекты
+        при этом не изменяются.'''
+        self._new = {}
+        self._dirty = {}
+        self._removed = {}
 
+    # Поддержка контекста
     async def __aenter__(self):
         self._token = context.set(self)
         return self
