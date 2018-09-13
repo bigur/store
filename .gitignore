@@ -9,4 +9,5 @@ __pycache__
 /bigur_store.egg-info
 
 # Тесты
+/.env
 /.pytest_cache
