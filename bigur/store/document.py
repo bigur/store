@@ -13,9 +13,11 @@ from uuid import uuid4
 from warnings import warn
 
 from bson.dbref import DBRef
+from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
 from bigur.store.typing import Id, Document as DocumentType
-from bigur.store.database import DBProxy, db
+from bigur.store.database import DBProxy, Collection, Cursor
+from bigur.store.database import db
 from bigur.store.lazy_ref import LazyRef
 from bigur.store.unit_of_work import context
 
@@ -192,7 +194,7 @@ class Stored(Document):
 
         self.mark_new()
 
-        self.__unit_of_work = context.get()
+        self.__unit_of_work__ = context.get()
 
         super().__init__()
         logger.debug('Stored.__init__ (%s) end', self)
@@ -206,7 +208,7 @@ class Stored(Document):
     def __setattr__(self, key: str, value: Any):
         logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
-        if key != '__unit_of_work' and hasattr(self, '__unit_of_work'):
+        if key != '__unit_of_work__' and hasattr(self, '__unit_of_work__'):
             self.mark_dirty(keys={key})
 
     # Регистрация объектов в UnitOfWork
@@ -235,10 +237,16 @@ class Stored(Document):
 
     def mark_removed(self) -> None:
         '''Помечает объект как удалённый в единице работы.'''
+        if getattr(self, '_id', None) is not None:
+            logger.debug('Помечаю объект %s как удалённый', self)
+            uow = context.get()
+            if uow is not None:
+                uow.register_removed(self)
 
     # Коллекция
     @classmethod
-    def get_collection(cls):
+    def get_collection(cls) -> Collection:
+        '''Возвращает коллекцию MongoDB, отвечающую за данный класс.'''
         meta = cls.__metadata__
         if 'dbconfig' in meta:
             # XXX: на каждый класс создаётся свой Proxy! Надо сделать один.
@@ -254,25 +262,53 @@ class Stored(Document):
 
     # Запрос объектов из базы данных
     @classmethod
-    def find(cls, *args, **kwargs):
-        return cls.get_collection().find(*args, **kwargs)
+    def find(cls, query: dict) -> Cursor:
+        '''Возвращает курсор для перебора объектов.'''
+        return cls.get_collection().find(query)
 
     @classmethod
-    async def find_one(cls, *args, **kwargs):
-        return await cls.get_collection().find_one(*args, **kwargs)
+    async def find_one(cls, query: dict) -> Cursor:
+        '''Возвращает один объект из БД, удовлетворяющий условиям
+        поиска `query`, или None.'''
+        return await cls.get_collection().find_one(query)
 
     # Изменение объектов
     @classmethod
-    async def insert_one(cls, *args, **kwargs):
-        return await cls.get_collection().insert_one(*args, **kwargs)
+    async def insert_one(cls, document: 'Stored') -> InsertOneResult:
+        '''Вставляет документ в базу данных.'''
+        collection = cls.get_collection()
+        state = document.__getstate__()
+        return await collection.insert_one(state)
 
     @classmethod
-    async def update_one(cls, *args, **kwargs):
-        return await cls.get_collection().update_one(*args, **kwargs)
+    async def update_one(cls, document: 'Stored',
+                         keys: Set[str]) -> UpdateResult:
+        '''Обновляет документ в базу данных. Если указаны keys, то
+        обновление происходит через `update_one`, иначе через
+        `replace_one`.'''
+        collection = cls.get_collection()
+
+        state = document.__getstate__()
+
+        if keys:
+            update = {}
+            for key in keys:
+                path = key.split('.')
+                obj = state
+                for attr in path:
+                    obj = obj[attr]
+                update[key] = obj
+            query: dict = {'$set': update}
+            logger.debug('Запрос на обновление: %s', query)
+
+            return await collection.update_one({'_id': document.id}, query)
+        else:
+            return collection.replace_one({'_id': document.id}, state)
 
     @classmethod
-    async def delete_one(cls, *args, **kwargs):
-        return await cls.get_collection().delete_one(*args, **kwargs)
+    async def delete_one(cls, document: 'Stored') -> DeleteResult:
+        '''Удаляет `document` из базы данных.'''
+        return await cls.get_collection().delete_one({'_id': document.id})
 
     # Сохранение объекта в БД
     async def save(self):
@@ -297,4 +333,5 @@ class Stored(Document):
         return self
 
     async def remove(self):
-        pass
+        '''Помечает объект на удаление.'''
+        self.mark_removed()

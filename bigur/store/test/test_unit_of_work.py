@@ -4,21 +4,16 @@ __author__ = 'Gennady Kovalev <gik@bigur.ru>'
 __copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
+# pylint: disable=protected-access,unused-argument,redefined-outer-name
+# pylint: disable=unused-import
+
 from typing import Optional
 
-from pytest import fixture, mark
+from pytest import mark
 
 from bigur.store.document import Embedded, Stored
 from bigur.store.unit_of_work import UnitOfWork, context
-
-
-# pylint: disable=protected-access
-
-@fixture
-def debug(caplog):
-    '''Отладка тестов.'''
-    from logging import DEBUG
-    caplog.set_level(DEBUG, logger='bigur.store')
+from bigur.store.test.fixtures import configured, debug, database
 
 
 class Flat(Embedded):
@@ -89,7 +84,7 @@ class TestUnitOfWork(object):
         async with UnitOfWork() as uow:
             address = object.__new__(Address)
             address.__setstate__({
-                '__unit_of_work': uow,
+                '__unit_of_work__': uow,
                 '_id': 'test',
                 'street': 'Тверская'
             })
@@ -97,6 +92,7 @@ class TestUnitOfWork(object):
 
             address.street = 'Никольская'
 
+            assert address.street == 'Никольская'
             assert list(uow._new.keys()) == []
             assert list(uow._dirty.keys()) == [address.id]
 
@@ -132,7 +128,7 @@ class TestUnitOfWork(object):
             assert list(uow._dirty[address.id][1]) == ['house.flat']
 
     @mark.asyncio
-    async def test_nested_3(self, debug):
+    async def test_nested_3(self):
         '''Изменение вложенных на 2 уровня документов.'''
         async with UnitOfWork() as uow:
             flat = Flat(25)
@@ -146,3 +142,46 @@ class TestUnitOfWork(object):
             assert list(uow._dirty.keys()) == [address.id]
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.flat.number']
+
+    @configured
+    @mark.asyncio
+    async def test_commit_new(self, database):
+        '''Запись нового объекта в базу данных.'''
+        async with UnitOfWork():
+            address = Address('Тверская')
+
+        document = await Address.find_one({'_id': address.id})
+        assert isinstance(document, Address)
+        assert document.id == address.id
+        assert document.street == 'Тверская'
+
+    @configured
+    @mark.asyncio
+    async def test_commit_dirty(self, database):
+        '''Запись изменённого объекта в базу данных.'''
+        async with UnitOfWork():
+            address = Address('Тверская')
+
+        async with UnitOfWork():
+            address = await Address.find_one({'_id': address.id})
+            address.street = 'Никитская'
+
+        document = await Address.find_one({'_id': address.id})
+        assert isinstance(document, Address)
+        assert document.id == address.id
+        assert document.street == 'Никитская'
+
+    @configured
+    @mark.asyncio
+    async def test_commit_removed(self, database):
+        '''Запись изменённого объекта в базу данных.'''
+        async with UnitOfWork():
+            address = Address('Тверская')
+            address_id = address.id
+
+        async with UnitOfWork():
+            address = await Address.find_one({'_id': address_id})
+            await address.remove()
+
+        document = await Address.find_one({'_id': address_id})
+        assert document is None

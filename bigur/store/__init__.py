@@ -8,3 +8,4 @@ from .database import db
 from .document import Embedded, Stored
 from .lazy_ref import LazyRef
 from .migrator import Migrator, transition
+from .unit_of_work import UnitOfWork

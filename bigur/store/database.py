@@ -10,11 +10,13 @@ from sys import modules
 from urllib.parse import urlparse
 
 from motor.core import AgnosticBaseProperties
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCursor, AsyncIOMotorDatabase, AsyncIOMotorCollection
+from motor.motor_asyncio import (AsyncIOMotorClient, AsyncIOMotorCursor,
+                                 AsyncIOMotorDatabase, AsyncIOMotorCollection)
 
-from bigur.utils import class_by_name, config
+from bigur.utils import config
 
 from bigur.store.typing import DatabaseDict, Document
+from bigur.store.unit_of_work import context
 
 
 DocumentOrObject = Union[Document, DatabaseDict]
@@ -33,6 +35,7 @@ def compile_object(document: DatabaseDict) -> DocumentOrObject:
         cls = getattr(module, class_name)
         obj = cls.__new__(cls)
         obj.__setstate__(document)
+        obj.__unit_of_work__ = context.get()
         document = obj
 
     return document
@@ -69,17 +72,14 @@ class Collection(AsyncIOMotorCollection):
 
     async def find_one(self, *args, **kwargs) -> DocumentOrObject:
         '''Получение одного объекта.'''
-
         return compile_object((await super().find_one(*args, **kwargs)))
 
     async def count_documents(self, *args, **kwargs) -> int:
         '''Получение числа документов, которое будет возвращенго запросом.'''
-
         return await super().count(*args, **kwargs)
 
     def find(self, *args, **kwargs) -> 'Cursor':
         '''Возвращает :class:`~.Cursor` для итерации.'''
-
         return Cursor(self.delegate.find(*args, **kwargs), self)
 
 
@@ -88,7 +88,6 @@ class Cursor(AsyncIOMotorCursor):
 
     def next_object(self) -> DocumentOrObject:
         '''Получение документа из курсора.'''
-
         return compile_object(super().next_object())
 
 

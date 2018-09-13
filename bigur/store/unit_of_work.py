@@ -1,12 +1,14 @@
+'''Единица работы.'''
+
 __author__ = 'Gennady Kovalev <gik@bigur.ru>'
 __copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
-from contextvars import ContextVar, Token  # pylint: disable=E0401
 from logging import getLogger
 from typing import Dict, Union, Tuple, Set
+from contextvars import ContextVar, Token  # pylint: disable=E0401
 
-from bigur.store.typing import Id, Scalar, Document
+from bigur.store.typing import Id, Document
 
 
 logger = getLogger('bigur.store.unit_of_work')
@@ -29,7 +31,6 @@ class UnitOfWork(object):
     # Управление очередями
     def register_new(self, document: Document) -> None:
         '''Ставит документ в очередь для создания в БД.'''
-
         id_ = document.id
         if not id_:
             raise ValueError('Документ должен содержать ИД.')
@@ -41,7 +42,6 @@ class UnitOfWork(object):
 
     def register_dirty(self, document: Document, keys: Set[str]) -> None:
         '''Ставит документ в очередь для обновления.'''
-
         id_ = document.id
         if not id_:
             raise ValueError('Документ должен содержать ИД.')
@@ -55,7 +55,6 @@ class UnitOfWork(object):
 
     def register_removed(self, document: Document) -> None:
         '''Ставит документ в очередь для удаления из БД.'''
-
         id_ = document.id
         if id_ in self._new:
             del self._new[id_]
@@ -68,18 +67,17 @@ class UnitOfWork(object):
     # Сохранение изменений в БД
     async def insert_new(self) -> None:
         '''Создаёт новые документы в базе данных.'''
-
         for document in self._new.values():
             await type(document).insert_one(document)
 
     async def update_dirty(self) -> None:
         '''Обновляет документы в базе данных.'''
-        for document, attrs in self._dirty.values():
-            await type(document).update_one(document, attrs)
+        for document, keys in self._dirty.values():
+            await type(document).update_one(document, keys)
 
     async def delete_removed(self) -> None:
         '''Удаляет документы из базы данных.'''
-        for document in self._new.values():
+        for document in self._removed.values():
             await type(document).delete_one(document)
 
     # Управление транзакцией
@@ -104,3 +102,8 @@ class UnitOfWork(object):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         context.reset(self._token)
         self._token = None
+
+        if exc_type is not None:
+            await self.rollback()
+        else:
+            await self.commit()
