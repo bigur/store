@@ -103,6 +103,7 @@ class Node(object):
         logger.debug('Node.__init__ (%s) end', self)
 
     def mark_dirty(self, keys: Set[str]) -> None:
+        '''Помечает корневой объект как грязный.'''
         parent = getattr(self, '__node_parent__', None)
         if parent is not None:
             name = self.__node_name__
@@ -177,6 +178,10 @@ class Document(DocumentType, Node):
             parent = getattr(self, '__node_parent__', None)
             if parent:
                 parent.mark_dirty({'{}.{}'.format(self.__node_name__, key)})
+
+    def __getattr__(self, key: str) -> Any:
+        if key in self.__dict__:
+            return self.__dict__[key]
 
 
 class Embedded(Document):

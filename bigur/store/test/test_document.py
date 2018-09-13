@@ -6,8 +6,8 @@ __licence__ = 'For license information see LICENSE'
 
 from typing import Optional
 
-from pytest import fixture, mark
-from bigur.store import Stored, Embedded, UnitOfWork
+from pytest import mark
+from bigur.store import Stored, Embedded
 
 
 class Flat(Embedded):
@@ -80,3 +80,9 @@ class TestDocument(object):
                 }
             }
         }
+
+    @mark.asyncio
+    async def test_non_existing_attr(self):
+        '''Получение None, если атрибут не существует.'''
+        address = Address('Никольская')
+        assert address.not_existing_attr is None
