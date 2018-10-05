@@ -24,6 +24,7 @@ def database():
     conf = config.get_object()
     conf.add_section('general')
     conf.set('general', 'database_uri', environ.get('BIGUR_TEST_DB'))
+    db._db = None # pylint: disable=protected-access
     return db
 
 
