@@ -59,15 +59,17 @@ class TestUnitOfWork(object):
         async with UnitOfWork() as uow:
             assert context.get() is uow
 
+    @configured
     @mark.asyncio
-    async def test_new(self):
+    async def test_new(self, database):
         '''Метка "новый" при создании.'''
         async with UnitOfWork() as uow:
             address = Address('Тверская')
             assert list(uow._new.keys()) == [address.id]
 
+    @configured
     @mark.asyncio
-    async def test_modify_new(self):
+    async def test_modify_new(self, database):
         '''Отсутствие метки "грязный" при изменении нового объекта.'''
         async with UnitOfWork() as uow:
             address = Address('Тверская')
@@ -78,8 +80,9 @@ class TestUnitOfWork(object):
             assert list(uow._new.keys()) == [address.id]
             assert list(uow._dirty.keys()) == []
 
+    @configured
     @mark.asyncio
-    async def test_modify(self):
+    async def test_modify(self, database):
         '''Метка "грязный" при изменении объекта.'''
         async with UnitOfWork() as uow:
             address = object.__new__(Address)
@@ -96,8 +99,9 @@ class TestUnitOfWork(object):
             assert list(uow._new.keys()) == []
             assert list(uow._dirty.keys()) == [address.id]
 
+    @configured
     @mark.asyncio
-    async def test_nested_1(self):
+    async def test_nested_1(self, database):
         '''Изменение вложенных на 1 уровень документов.'''
         async with UnitOfWork() as uow:
             house = House(5)
@@ -111,8 +115,9 @@ class TestUnitOfWork(object):
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.number']
 
+    @configured
     @mark.asyncio
-    async def test_nested_2(self, debug):
+    async def test_nested_2(self, database):
         '''Добавление документа 2 уровня вложенности.'''
         async with UnitOfWork() as uow:
             house = House(5)
@@ -127,8 +132,9 @@ class TestUnitOfWork(object):
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.flat']
 
+    @configured
     @mark.asyncio
-    async def test_nested_3(self):
+    async def test_nested_3(self, database):
         '''Изменение вложенных на 2 уровня документов.'''
         async with UnitOfWork() as uow:
             flat = Flat(25)
