@@ -19,13 +19,14 @@ def debug(caplog):
 
 
 @fixture
-def database():
+async def database():
     '''Доступ к базе данных.'''
     conf = config.get_object()
     conf.add_section('general')
     conf.set('general', 'database_uri', environ.get('BIGUR_TEST_DB'))
     db._db = None # pylint: disable=protected-access
-    return db
+    yield db
+    await db.client.drop_database(db.name)
 
 
 configured = mark.skipif(environ.get('BIGUR_TEST_DB') is None,

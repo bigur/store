@@ -293,18 +293,26 @@ class Stored(Document):
     async def insert_one(cls, document: 'Stored') -> InsertOneResult:
         '''Вставляет документ в базу данных.'''
         collection = cls.get_collection()
-        state = document.__getstate__()
+        # XXX: обратная совместимость
+        if isinstance(document, Stored):
+            state = document.__getstate__()
+        else:
+            state = document
         return await collection.insert_one(state)
 
     @classmethod
     async def update_one(cls, document: 'Stored',
-                         keys: Set[str]) -> UpdateResult:
+                         keys: Optional[Set[str]] = None) -> UpdateResult:
         '''Обновляет документ в базу данных. Если указаны keys, то
         обновление происходит через `update_one`, иначе через
         `replace_one`.'''
         collection = cls.get_collection()
 
-        state = document.__getstate__()
+        # XXX: обратная совместимость
+        if isinstance(document, Stored):
+            state = document.__getstate__()
+        else:
+            state = document
 
         if keys:
             update = {}
@@ -330,22 +338,13 @@ class Stored(Document):
     async def save(self):
         '''Сохранение объектов.'''
         warn('используйте единицу работы вместо прямой записи объекта.',
-             DeprecationWarning)
+             DeprecationWarning, stacklevel=2)
         state = self.__getstate__()
         if not getattr(self, '_saved', False):
             await self.insert_one(state)
             self._saved = True
         else:
-            unset = {}
-            for attr in self.__dict__:
-                value = getattr(self, attr)
-                if value is None:
-                    unset[attr] = None
-            if unset:
-                query = {'$set': state, '$unset': unset}
-            else:
-                query = {'$set': state}
-            await self.update_one({'_id': self._id}, query)
+            await self.update_one(self)
         return self
 
     async def remove(self):
