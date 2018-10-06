@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from logging import getLogger
 from sys import modules
-from typing import Dict, Any, Set, Optional, List, Dict, TypeVar, Iterable
+from typing import Dict, Any, Set, Optional, List, TypeVar, Iterable
 from uuid import uuid4
 from warnings import warn
 
@@ -86,7 +86,7 @@ def unpickle(obj: Any) -> Any:
         unpickled.__setstate__(obj)
 
     elif isinstance(obj, dict):
-        unpickled = Embedded
+        unpickled = EmbeddedDict()
         for key, value in obj.items():
             unpickled[key] = unpickle(value)
 
@@ -329,8 +329,8 @@ class Stored(Document):
     # Сохранение объекта в БД
     async def save(self):
         '''Сохранение объектов.'''
-        warn(DeprecationWarning, 'используйте единицу работы вместо '
-                                 'прямой записи объекта.')
+        warn('используйте единицу работы вместо прямой записи объекта.',
+             DeprecationWarning)
         state = self.__getstate__()
         if not getattr(self, '_saved', False):
             await self.insert_one(state)

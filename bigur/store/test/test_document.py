@@ -32,6 +32,7 @@ class Address(Stored):
         self.street: str = street
         self.house: Optional[House] = house
         self.letters: Optional[EmbeddedList[str]] = None
+        self.settings: Optional[EmbeddedDict[str, int]] = None
         super().__init__()
 
 
@@ -93,6 +94,7 @@ class TestDocument(object):
         '''Восстановление списка из базы.'''
         state = {
             '_class': 'store.test.test_document.Address',
+            'street': 'Шипиловская',
             'letters': [
                 'first',
                 'second'
@@ -101,3 +103,18 @@ class TestDocument(object):
         address = object.__new__(Address)
         address.__setstate__(state)
         assert isinstance(address.letters, EmbeddedList)
+
+    @mark.asyncio
+    async def test_dict_unpickle(self):
+        '''Восстановление словаря из базы.'''
+        state = {
+            '_class': 'store.test.test_document.Address',
+            'street': 'Домодедовская',
+            'settings': {
+                'first': 1,
+                'second': 2
+            }
+        }
+        address = object.__new__(Address)
+        address.__setstate__(state)
+        assert isinstance(address.settings, EmbeddedDict)
