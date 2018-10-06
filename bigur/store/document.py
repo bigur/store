@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from logging import getLogger
 from sys import modules
-from typing import Dict, Any, Set, Optional
+from typing import Dict, Any, Set, Optional, List, Dict, TypeVar, Iterable
 from uuid import uuid4
 from warnings import warn
 
@@ -23,6 +23,9 @@ from bigur.store.unit_of_work import context
 
 
 logger = getLogger('bigur.store.document')
+
+
+T = TypeVar('T')
 
 
 def pickle(obj: Any) -> Any:
@@ -66,7 +69,7 @@ def unpickle(obj: Any) -> Any:
         unpickled = obj.replace(tzinfo=timezone.utc)
 
     elif isinstance(obj, list):
-        unpickled = EmbeddedList
+        unpickled = EmbeddedList()
         for value in obj:
             unpickled.append(unpickle(value))
 
@@ -111,12 +114,20 @@ class Node(object):
             parent.mark_dirty(parent_keys)
 
 
-class EmbeddedList(Node, list):
+class EmbeddedList(Node, List[T]):
     '''Список, который является свойством документа БД.'''
+    def __init__(self, iterable: Iterable = ()) -> None:
+        # pylint: disable=E1003
+        super(EmbeddedList, self).__init__()
+        super(Node, self).__init__(iterable) # type: ignore
 
 
-class EmbeddedDict(Node, dict):
+class EmbeddedDict(Node, Dict):
     '''Словарь, который является свойством документа БД.'''
+    def __init__(self, *args, **kwargs) -> None:
+        # pylint: disable=E1003
+        super(EmbeddedDict, self).__init__()
+        super(Node, self).__init__(*args, **kwargs) # type: ignore
 
 
 class Document(DocumentType, Node):
@@ -213,7 +224,7 @@ class Stored(Document):
     def __setattr__(self, key: str, value: Any):
         logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
-        if key != '__unit_of_work__' and hasattr(self, '__unit_of_work__'):
+        if key != '__unit_of_work__' and '__unit_of_work__' in self.__dict__:
             self.mark_dirty(keys={key})
 
     # Регистрация объектов в UnitOfWork

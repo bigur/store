@@ -7,7 +7,7 @@ __licence__ = 'For license information see LICENSE'
 from typing import Optional
 
 from pytest import mark
-from bigur.store import Stored, Embedded
+from bigur.store import Stored, Embedded, EmbeddedList, EmbeddedDict
 
 
 class Flat(Embedded):
@@ -31,6 +31,7 @@ class Address(Stored):
     def __init__(self, street: str, house: Optional[House] = None) -> None:
         self.street: str = street
         self.house: Optional[House] = house
+        self.letters: Optional[EmbeddedList[str]] = None
         super().__init__()
 
 
@@ -86,3 +87,17 @@ class TestDocument(object):
         '''Получение None, если атрибут не существует.'''
         address = Address('Никольская')
         assert address.not_existing_attr is None
+
+    @mark.asyncio
+    async def test_list_unpickle(self):
+        '''Восстановление списка из базы.'''
+        state = {
+            '_class': 'store.test.test_document.Address',
+            'letters': [
+                'first',
+                'second'
+            ]
+        }
+        address = object.__new__(Address)
+        address.__setstate__(state)
+        assert isinstance(address.letters, EmbeddedList)
