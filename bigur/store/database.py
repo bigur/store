@@ -119,4 +119,4 @@ class DBProxy(object):
         return self._db[key]
 
 
-db = DBProxy('general', 'database_uri', 'mongodb://localhost/test')
+db = DBProxy('general', 'database_url', 'mongodb://localhost/test')
