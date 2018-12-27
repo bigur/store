@@ -224,7 +224,8 @@ class Stored(Document):
     def __setattr__(self, key: str, value: Any):
         logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
-        if key != '__unit_of_work__' and '__unit_of_work__' in self.__dict__:
+        if key not in ('__unit_of_work__', '__node_parent__', '__node_name__') \
+                and '__unit_of_work__' in self.__dict__:
             self.mark_dirty(keys={key})
 
     # Регистрация объектов в UnitOfWork
