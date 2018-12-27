@@ -7,10 +7,12 @@ __licence__ = 'For license information see LICENSE'
 from datetime import datetime
 from logging import getLogger
 from re import sub
+from urllib.parse import urlparse
 from uuid import uuid4
 
-from bigur.rx import Observer
-from bigur.utils import localzone
+from motor.motor_asyncio import AsyncIOMotorClient
+from bigur.rx import ObserverBase
+from bigur.utils import config, localzone
 
 
 logger = getLogger('bigur.store.migrator')
@@ -30,7 +32,7 @@ class transition(object):
         return meth
 
 
-class Migrator(Observer):
+class Migrator(ObserverBase):
     '''Мигратор, обеспечивает обновление базы данных с одной
     версии на другую.'''
 
@@ -127,8 +129,11 @@ class Migrator(Observer):
 
         for to_version, meth in path:
             logger.debug('Обновляю БД до версии %s для компоненты %s',
-                          to_version, self.component)
-            await meth(db)
+                         to_version, self.component)
+            uri = config.get(db._section, db._param, fallback=db._fallback)
+            db_name = urlparse(uri).path.strip('/')
+            direct_db = AsyncIOMotorClient(uri)[db_name]
+            await meth(direct_db)
             if db_version is None:
                 db_version = {'_id': str(uuid4()),
                               'component': self.component,
@@ -141,4 +146,8 @@ class Migrator(Observer):
                     {'$set': {'timestamp': datetime.now(tz=localzone),
                               'version': to_version}})
 
+    async def on_error(self, error: Exception):
+        raise error
+
+    async def on_completed(self):
         logger.debug('Закончил миграцию для %s', self.component)
