@@ -2,12 +2,15 @@
 *.pyc
 __pycache__
 
-# Кеш mypy
+# Mypy cache
 /.mypy_cache
 
-# Файлы egg-info
+# Files egg-info
 /bigur_store.egg-info
 
-# Тесты
+# Tests
 /.env
 /.pytest_cache
+
+# Editors
+/.vscode
