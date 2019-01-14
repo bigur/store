@@ -6,10 +6,20 @@ __licence__ = 'For license information see LICENSE'
 
 from setuptools import setup
 
+exec( # pylint: disable=W0122
+    compile(
+        open('bigur/store/version.py', "rb").read(),
+        'bigur/store/version.py',
+        'exec'
+    ),
+    globals(),
+    locals()
+)
 
 setup(
     name='bigur-store',
-    version='3.0.1',
+    # pylint: disable=E0602
+    version=__version__, # type: ignore
 
     description='Взаимодействие с базой MongoDB',
     url='https://github.com/bigur/store',
