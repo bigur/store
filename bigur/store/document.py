@@ -122,12 +122,8 @@ class EmbeddedList(Node, List[T]):
         super(Node, self).__init__(iterable) # type: ignore
 
 
-class EmbeddedDict(Node, Dict):
+class EmbeddedDict(Node):
     '''Словарь, который является свойством документа БД.'''
-    def __init__(self, *args, **kwargs) -> None:
-        # pylint: disable=E1003
-        super(EmbeddedDict, self).__init__()
-        super(Node, self).__init__(*args, **kwargs) # type: ignore
 
 
 class Document(DocumentType, Node):
