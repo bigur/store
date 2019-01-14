@@ -32,7 +32,7 @@ class UnitOfWork(object):
     def register_new(self, document: Document) -> None:
         '''Ставит документ в очередь для создания в БД.'''
         id_ = document.id
-        if not id_:
+        if id_ is None:
             raise ValueError('Документ должен содержать ИД.')
         if id_ in self._dirty:
             raise ValueError('Документ уже изменён и не сохранён.')
