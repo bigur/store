@@ -122,7 +122,7 @@ class EmbeddedList(Node, List[T]):
         super(Node, self).__init__(iterable) # type: ignore
 
 
-class EmbeddedDict(Node):
+class EmbeddedDict(Node, Dict[str, Any]):
     '''Словарь, который является свойством документа БД.'''
 
 
@@ -331,19 +331,7 @@ class Stored(Document):
         '''Удаляет `document` из базы данных.'''
         return await cls.get_collection().delete_one({'_id': document.id})
 
-    # Сохранение объекта в БД
-    async def save(self):
-        '''Сохранение объектов.'''
-        warn('используйте единицу работы вместо прямой записи объекта.',
-             DeprecationWarning, stacklevel=2)
-        state = self.__getstate__()
-        if not getattr(self, '_saved', False):
-            await self.insert_one(state)
-            self._saved = True
-        else:
-            await self.update_one(self)
-        return self
-
+    # Удаление объекта
     async def remove(self):
         '''Помечает объект на удаление.'''
         self.mark_removed()
