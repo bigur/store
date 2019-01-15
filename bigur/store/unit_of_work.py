@@ -43,7 +43,7 @@ class UnitOfWork(object):
     def register_dirty(self, document: Document, keys: Set[str]) -> None:
         '''Ставит документ в очередь для обновления.'''
         id_ = document.id
-        if not id_:
+        if id_ is None:
             raise ValueError('Документ должен содержать ИД.')
         if id_ in self._removed:
             raise ValueError('Документ помечен на удаление.')
@@ -56,6 +56,8 @@ class UnitOfWork(object):
     def register_removed(self, document: Document) -> None:
         '''Ставит документ в очередь для удаления из БД.'''
         id_ = document.id
+        if id_ is None:
+            raise ValueError('Документ должен содержать ИД.')
         if id_ in self._new:
             del self._new[id_]
         else:
