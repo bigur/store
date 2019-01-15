@@ -10,7 +10,6 @@ from logging import getLogger
 from sys import modules
 from typing import Dict, Any, Set, Optional, List, TypeVar, Iterable
 from uuid import uuid4
-from warnings import warn
 
 from bson.dbref import DBRef
 from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
@@ -122,7 +121,7 @@ class EmbeddedList(Node, List[T]):
         super(Node, self).__init__(iterable) # type: ignore
 
 
-class EmbeddedDict(Node):
+class EmbeddedDict(Node, Dict[str, Any]):
     '''Словарь, который является свойством документа БД.'''
 
 
@@ -290,11 +289,7 @@ class Stored(Document):
     async def insert_one(cls, document: 'Stored') -> InsertOneResult:
         '''Вставляет документ в базу данных.'''
         collection = cls.get_collection()
-        # XXX: обратная совместимость
-        if isinstance(document, Stored):
-            state = document.__getstate__()
-        else:
-            state = document
+        state = document.__getstate__()
         return await collection.insert_one(state)
 
     @classmethod
@@ -305,21 +300,26 @@ class Stored(Document):
         `replace_one`.'''
         collection = cls.get_collection()
 
-        # XXX: обратная совместимость
-        if isinstance(document, Stored):
-            state = document.__getstate__()
-        else:
-            state = document
+        state = document.__getstate__()
 
         if keys:
-            update = {}
+            update: Dict[str, Any] = {}
+            remove: Dict[str, None] = {}
             for key in keys:
                 path = key.split('.')
-                obj = state
+                obj: Any = state
                 for attr in path:
-                    obj = obj[attr]
-                update[key] = obj
-            query: dict = {'$set': update}
+                    obj = obj.get(attr)
+                if obj is None:
+                    remove[key] = obj
+                else:
+                    update[key] = obj
+
+            query: dict = {}
+            if update:
+                query['$set'] = update
+            if remove:
+                query['$unset'] = remove
             logger.debug('Запрос на обновление: %s', query)
 
             return await collection.update_one({'_id': document.id}, query)
@@ -331,19 +331,7 @@ class Stored(Document):
         '''Удаляет `document` из базы данных.'''
         return await cls.get_collection().delete_one({'_id': document.id})
 
-    # Сохранение объекта в БД
-    async def save(self):
-        '''Сохранение объектов.'''
-        warn('используйте единицу работы вместо прямой записи объекта.',
-             DeprecationWarning, stacklevel=2)
-        state = self.__getstate__()
-        if not getattr(self, '_saved', False):
-            await self.insert_one(state)
-            self._saved = True
-        else:
-            await self.update_one(self)
-        return self
-
+    # Удаление объекта
     async def remove(self):
         '''Помечает объект на удаление.'''
         self.mark_removed()

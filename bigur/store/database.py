@@ -104,9 +104,9 @@ class DBProxy(object):
         return self._db
 
     def _configure(self) -> None:
-        uri = config.get(self._section, self._param, fallback=self._fallback)
-        db_name = urlparse(uri).path.strip('/')
-        self._db = Client(uri)[db_name]
+        url = config.get(self._section, self._param, fallback=self._fallback)
+        db_name = urlparse(url).path.strip('/')
+        self._db = Client(url)[db_name]
 
     def __getattr__(self, key):
         if self._db is None:

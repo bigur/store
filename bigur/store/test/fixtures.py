@@ -22,11 +22,13 @@ def debug(caplog):
 async def database():
     '''Доступ к базе данных.'''
     conf = config.get_object()
-    conf.add_section('general')
-    conf.set('general', 'database_uri', environ.get('BIGUR_TEST_DB'))
+    if not conf.has_section('general'):
+        conf.add_section('general')
+    conf.set('general', 'database_url', environ.get('BIGUR_TEST_DB'))
     db._db = None # pylint: disable=protected-access
+    for collection in await db.list_collection_names():
+        await db.drop_collection(collection)
     yield db
-    await db.client.drop_database(db.name)
 
 
 configured = mark.skipif(environ.get('BIGUR_TEST_DB') is None,
