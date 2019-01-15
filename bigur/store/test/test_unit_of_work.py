@@ -49,7 +49,7 @@ class Address(Stored):
         return 'Address({})'.format(id(self))
 
 
-class TestUnitOfWork(object):
+class TestUnitOfWork:
     '''Тесты единицы работы.'''
 
     @mark.asyncio
@@ -177,10 +177,10 @@ class TestUnitOfWork(object):
         assert document.id == address.id
         assert document.street == 'Никитская'
 
-    @configured
     @mark.asyncio
-    async def test_commit_removed(self, database):
-        '''Запись изменённого объекта в базу данных.'''
+    @configured
+    async def test_commit_removed(self, database, debug):
+        '''Удаление объекта из БД.'''
         async with UnitOfWork():
             address = Address('Тверская')
             address_id = address.id
@@ -191,3 +191,22 @@ class TestUnitOfWork(object):
 
         document = await Address.find_one({'_id': address_id})
         assert document is None
+
+    @configured
+    @mark.asyncio
+    async def test_delete_attribute(self, database, debug):
+        '''Удаление атрибута.'''
+        async with UnitOfWork():
+            address = Address('Никольская')
+            address.house = 12
+
+        async with UnitOfWork():
+            address = await Address.find_one({'_id': address.id})
+        assert address.house == 12
+
+        async with UnitOfWork():
+            address = await Address.find_one({'_id': address.id})
+            address.house = None
+
+        state = address.__getstate__()
+        assert 'house' not in state
