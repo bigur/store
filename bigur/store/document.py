@@ -118,7 +118,7 @@ class EmbeddedList(Node, List[T]):
     def __init__(self, iterable: Iterable = ()) -> None:
         # pylint: disable=E1003
         super(EmbeddedList, self).__init__()
-        super(Node, self).__init__(iterable) # type: ignore
+        super(Node, self).__init__(iterable)  # type: ignore
 
 
 class EmbeddedDict(Node, Dict[str, Any]):
@@ -211,7 +211,7 @@ class Stored(Document):
         logger.debug('Stored.__init__ (%s) end', self)
 
     @property
-    def id(self): # pylint: disable=invalid-name
+    def id(self):
         '''Возвращает идентификатор объекта, хранящийся в `self._id`.'''
         return self._id
 
@@ -219,7 +219,9 @@ class Stored(Document):
     def __setattr__(self, key: str, value: Any):
         logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
-        if key not in ('__unit_of_work__', '__node_parent__', '__node_name__') \
+        if key not in ('__unit_of_work__',
+                       '__node_parent__',
+                       '__node_name__') \
                 and '__unit_of_work__' in self.__dict__:
             self.mark_dirty(keys={key})
 
@@ -245,7 +247,8 @@ class Stored(Document):
             if uow is not None:
                 uow.register_dirty(self, keys)
             else:
-                logger.warning('Изменяю объект вне контекста БД.', stack_info=True)
+                logger.warning(
+                    'Изменяю объект вне контекста БД.', stack_info=True)
 
     def mark_removed(self) -> None:
         '''Помечает объект как удалённый в единице работы.'''
@@ -270,7 +273,7 @@ class Stored(Document):
         name = meta.get('collection')
         if name is None:
             name = str(cls.__name__).lower()
-        return dbase[name] # pylint: disable=E1136
+        return dbase[name]
 
     # Запрос объектов из базы данных
     @classmethod

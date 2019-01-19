@@ -7,6 +7,7 @@ __licence__ = 'For license information see LICENSE'
 from datetime import datetime
 from logging import getLogger
 from re import sub
+from typing import Callable, Dict, List
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -36,8 +37,8 @@ class Migrator(ObserverBase):
     '''Мигратор, обеспечивает обновление базы данных с одной
     версии на другую.'''
 
-    migrators = {}
-    transitions = []
+    migrators: Dict[str, 'Migrator'] = {}
+    transitions: List[Callable] = []
 
     def __init__(self, component, version):
         self.component = component
@@ -124,8 +125,8 @@ class Migrator(ObserverBase):
         # Проверяем, не апгрейдит ли последний метод до версии большоей, чем
         # версия компоненты.
         if path and path[-1][0] != self.version:
-            raise KeyError('последний мигратор апгрейдит компоненту до версии, '
-                           'большей чем сама компонента')
+            raise KeyError('последний мигратор апгрейдит компоненту до '
+                           'версии, большей чем сама компонента')
 
         for to_version, meth in path:
             logger.debug('Обновляю БД до версии %s для компоненты %s',

@@ -56,7 +56,7 @@ class Database(AsyncIOMotorDatabase):
     def __init__(self, client: Client, name: str, _delegate=None) -> None:
         self._client: Client = client
         delegate = _delegate or self.__delegate_class__(client.delegate, name)
-        super(AgnosticBaseProperties, self).__init__(delegate) # pylint: disable=E1003
+        super(AgnosticBaseProperties, self).__init__(delegate)
 
     def __getitem__(self, name: str) -> 'Collection':
         return Collection(self, name)
@@ -67,8 +67,9 @@ class Collection(AsyncIOMotorCollection):
 
     def __init__(self, database: Database, name: str, _delegate=None) -> None:
         self.database: Database = database
-        delegate = _delegate or self.__delegate_class__(database.delegate, name)
-        super(AgnosticBaseProperties, self).__init__(delegate) # pylint: disable=E1003
+        delegate = _delegate or self.__delegate_class__(
+            database.delegate, name)
+        super(AgnosticBaseProperties, self).__init__(delegate)
 
     async def find_one(self, *args, **kwargs) -> DocumentOrObject:
         '''Получение одного объекта.'''
