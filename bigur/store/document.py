@@ -264,9 +264,8 @@ class Stored(Document):
         '''Возвращает коллекцию MongoDB, отвечающую за данный класс.'''
         meta = cls.__metadata__
         if 'dbconfig' in meta:
-            # XXX: на каждый класс создаётся свой Proxy! Надо сделать один.
-            dbase = DBProxy(meta['dbconfig']['section'],
-                            meta['dbconfig']['param'])
+            dbase = DBProxy.get_for_config(meta['dbconfig']['section'],
+                                           meta['dbconfig']['param'])
         else:
             dbase = db
 
