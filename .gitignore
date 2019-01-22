@@ -1,16 +1,15 @@
-# Файлы python
+# Python
 *.pyc
 __pycache__
 
-# Mypy cache
-/.mypy_cache
+# *.egg-info
+/*.egg-info
 
-# Files egg-info
-/bigur_store.egg-info
+# MyPy
+.mypy_cache
 
-# Tests
+# CTags
+/.vscode/tags
+
+# Environ
 /.env
-/.pytest_cache
-
-# Editors
-/.vscode
