@@ -11,6 +11,9 @@ from bigur.utils import config
 from bigur.store.database import db
 
 
+__all__ = ('debug', 'database', 'configured')
+
+
 @fixture
 def debug(caplog):
     '''Отладка тестов.'''
@@ -25,7 +28,7 @@ async def database():
     if not conf.has_section('general'):
         conf.add_section('general')
     conf.set('general', 'database_url', environ.get('BIGUR_TEST_DB'))
-    db._db = None # pylint: disable=protected-access
+    db._db = None
     for collection in await db.list_collection_names():
         await db.drop_collection(collection)
     yield db

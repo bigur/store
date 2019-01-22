@@ -5,7 +5,7 @@ __copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
 from importlib import import_module
-from typing import Union, Optional
+from typing import Dict, Union, Optional
 from sys import modules
 from urllib.parse import urlparse
 
@@ -56,7 +56,7 @@ class Database(AsyncIOMotorDatabase):
     def __init__(self, client: Client, name: str, _delegate=None) -> None:
         self._client: Client = client
         delegate = _delegate or self.__delegate_class__(client.delegate, name)
-        super(AgnosticBaseProperties, self).__init__(delegate) # pylint: disable=E1003
+        super(AgnosticBaseProperties, self).__init__(delegate)
 
     def __getitem__(self, name: str) -> 'Collection':
         return Collection(self, name)
@@ -67,8 +67,9 @@ class Collection(AsyncIOMotorCollection):
 
     def __init__(self, database: Database, name: str, _delegate=None) -> None:
         self.database: Database = database
-        delegate = _delegate or self.__delegate_class__(database.delegate, name)
-        super(AgnosticBaseProperties, self).__init__(delegate) # pylint: disable=E1003
+        delegate = _delegate or self.__delegate_class__(
+            database.delegate, name)
+        super(AgnosticBaseProperties, self).__init__(delegate)
 
     async def find_one(self, *args, **kwargs) -> DocumentOrObject:
         '''Получение одного объекта.'''
@@ -92,12 +93,25 @@ class Cursor(AsyncIOMotorCursor):
 
 
 class DBProxy(object):
+
+    __cache__: Dict[str, 'DBProxy'] = {}
+
     def __init__(self, section: str, param: str,
                  fallback: Optional[str] = None) -> None:
         self._section: str = section
         self._param: str = param
         self._fallback: Optional[str] = fallback
         self._db: Optional[Database] = None
+
+    @classmethod
+    def get_for_config(cls, section, param):
+        cache = cls.__cache__
+        cache_key = '{}-{}'.format(section, param)
+        if cache_key in cache:
+            proxy = cache[cache_key]
+        else:
+            cache[cache_key] = proxy = DBProxy(section, param)
+        return proxy
 
     @property
     def origin(self) -> Optional[Database]:

@@ -71,16 +71,19 @@ class UnitOfWork(object):
         '''Создаёт новые документы в базе данных.'''
         for document in self._new.values():
             await type(document).insert_one(document)
+        self._new = {}
 
     async def update_dirty(self) -> None:
         '''Обновляет документы в базе данных.'''
         for document, keys in self._dirty.values():
             await type(document).update_one(document, keys)
+        self._dirty = {}
 
     async def delete_removed(self) -> None:
         '''Удаляет документы из базы данных.'''
         for document in self._removed.values():
             await type(document).delete_one(document)
+        self._removed = {}
 
     # Управление транзакцией
     async def commit(self) -> None:

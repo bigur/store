@@ -37,11 +37,12 @@ class LazyRef(object):
             dbase = self.dbref.database
             if dbase is None:
                 dbase = db
-            collection = dbase[self.dbref.collection] # pylint: disable=E1136
+            collection = dbase[self.dbref.collection]
             obj = await collection.find_one({'_id': self.dbref.id})
             if obj is None:
-                raise IntegrityError('не смог подгрузить объект из коллекции {} с ИД {}'.format(
-                    self.dbref.collection, self.dbref.id))
+                raise IntegrityError(
+                    'не смог подгрузить объект из коллекции {} с ИД {}'.format(
+                        self.dbref.collection, self.dbref.id))
             self.obj = obj
         return self.obj
 
@@ -55,5 +56,6 @@ class LazyRef(object):
             super().__setattr__(key, value)
         else:
             if self.obj is None:
-                raise NotResolved('загрузите объект из базы с помощью <ref>.resolve()')
+                raise NotResolved('загрузите объект из базы '
+                                  'с помощью <ref>.resolve()')
             setattr(self.obj, key, value)
