@@ -11,9 +11,6 @@ from bigur.utils import config
 from bigur.store.database import db
 
 
-__all__ = ('debug', 'database', 'configured')
-
-
 @fixture
 def debug(caplog):
     '''Отладка тестов.'''
@@ -34,5 +31,5 @@ async def database():
     yield db
 
 
-configured = mark.skipif(environ.get('BIGUR_TEST_DB') is None,
-                         reason='Не настроена база данных')
+mark.db_configured = mark.skipif(
+    environ.get('BIGUR_TEST_DB') is None, reason='Не настроена база данных')

@@ -13,11 +13,11 @@ from pytest import mark
 
 from bigur.store.document import Embedded, Stored
 from bigur.store.unit_of_work import UnitOfWork, context
-from bigur.store.test.fixtures import configured, debug, database  # noqa: F401
 
 
 class Flat(Embedded):
     '''Квартира.'''
+
     def __init__(self, number: int) -> None:
         self.number: int = number
         super().__init__()
@@ -28,6 +28,7 @@ class Flat(Embedded):
 
 class House(Embedded):
     '''Дом.'''
+
     def __init__(self, number: int, flat: Optional[Flat] = None) -> None:
         self.number: int = number
         self.flat: Optional[Flat] = flat
@@ -59,7 +60,7 @@ class TestUnitOfWork:
         async with UnitOfWork() as uow:
             assert context.get() is uow
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_new(self, database):
         '''Метка "новый" при создании.'''
@@ -67,7 +68,7 @@ class TestUnitOfWork:
             address = Address('Тверская')
             assert list(uow._new.keys()) == [address.id]
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_modify_new(self, database):
         '''Отсутствие метки "грязный" при изменении нового объекта.'''
@@ -80,7 +81,7 @@ class TestUnitOfWork:
             assert list(uow._new.keys()) == [address.id]
             assert list(uow._dirty.keys()) == []
 
-    @configured  # noqa: F811
+    @mark.db_configured
     @mark.asyncio
     async def test_modify(self, database):
         '''Метка "грязный" при изменении объекта.'''
@@ -99,7 +100,7 @@ class TestUnitOfWork:
             assert list(uow._new.keys()) == []
             assert list(uow._dirty.keys()) == [address.id]
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_nested_1(self, database):
         '''Изменение вложенных на 1 уровень документов.'''
@@ -115,7 +116,7 @@ class TestUnitOfWork:
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.number']
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_nested_2(self, database):
         '''Добавление документа 2 уровня вложенности.'''
@@ -132,7 +133,7 @@ class TestUnitOfWork:
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.flat']
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_nested_3(self, database):
         '''Изменение вложенных на 2 уровня документов.'''
@@ -149,7 +150,7 @@ class TestUnitOfWork:
             assert uow._dirty[address.id][0] == address
             assert list(uow._dirty[address.id][1]) == ['house.flat.number']
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_commit_new(self, database):
         '''Запись нового объекта в базу данных.'''
@@ -161,7 +162,7 @@ class TestUnitOfWork:
         assert document.id == address.id
         assert document.street == 'Тверская'
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_commit_dirty(self, database):
         '''Запись изменённого объекта в базу данных.'''
@@ -177,7 +178,7 @@ class TestUnitOfWork:
         assert document.id == address.id
         assert document.street == 'Никитская'
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_commit_removed(self, database):
         '''Удаление объекта из БД.'''
@@ -192,7 +193,7 @@ class TestUnitOfWork:
         document = await Address.find_one({'_id': address_id})
         assert document is None
 
-    @configured  # noqa: F811
+    @mark.db_configured  # noqa: F811
     @mark.asyncio
     async def test_delete_attribute(self, database, debug):
         '''Удаление атрибута.'''
