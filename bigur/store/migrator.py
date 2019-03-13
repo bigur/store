@@ -15,13 +15,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bigur.rx import ObserverBase
 from bigur.utils import config, localzone
 
-
-logger = getLogger('bigur.store.migrator')
+logger = getLogger(__name__)
 
 
 class transition(object):
     '''Декаратор, определяет поведение метода миграции, с какой
     версии на какую он обновляет базу данных.'''
+
     def __init__(self, component, from_version, to_version):
         self.component = component
         self.from_version = from_version
@@ -136,16 +136,22 @@ class Migrator(ObserverBase):
             direct_db = AsyncIOMotorClient(uri)[db_name]
             await meth(direct_db)
             if db_version is None:
-                db_version = {'_id': str(uuid4()),
-                              'component': self.component,
-                              'version': to_version,
-                              'timestamp': datetime.now(tz=localzone)}
+                db_version = {
+                    '_id': str(uuid4()),
+                    'component': self.component,
+                    'version': to_version,
+                    'timestamp': datetime.now(tz=localzone)
+                }
                 await db.versions.insert_one(db_version)
             else:
-                await db.versions.update_one(
-                    {'_id': db_version['_id']},
-                    {'$set': {'timestamp': datetime.now(tz=localzone),
-                              'version': to_version}})
+                await db.versions.update_one({
+                    '_id': db_version['_id']
+                }, {
+                    '$set': {
+                        'timestamp': datetime.now(tz=localzone),
+                        'version': to_version
+                    }
+                })
 
     async def on_error(self, error: Exception):
         raise error

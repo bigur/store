@@ -8,10 +8,11 @@ from logging import getLogger
 from typing import Dict, Union, Tuple, Set
 from contextvars import ContextVar, Token  # pylint: disable=E0401
 
-from bigur.store.typing import Id, Document
+from bson import ObjectId
 
+from bigur.store.typing import Document
 
-logger = getLogger('bigur.store.unit_of_work')
+logger = getLogger(__name__)
 
 context: ContextVar = ContextVar('uow', default=None)
 
@@ -22,15 +23,16 @@ class UnitOfWork(object):
     def __init__(self) -> None:
         self._token: Union[Token, None] = None
 
-        self._new: Dict[Id, Document] = {}
-        self._dirty: Dict[Id, Tuple[Document, Set[str]]] = {}
-        self._removed: Dict[Id, Document] = {}
+        self._new: Dict[ObjectId, Document] = {}
+        self._dirty: Dict[ObjectId, Tuple[Document, Set[str]]] = {}
+        self._removed: Dict[ObjectId, Document] = {}
 
         super().__init__()
 
     # Управление очередями
     def register_new(self, document: Document) -> None:
         '''Ставит документ в очередь для создания в БД.'''
+        logger.debug('Register new document: %s', document)
         id_ = document.id
         if id_ is None:
             raise ValueError('Документ должен содержать ИД.')
@@ -42,6 +44,7 @@ class UnitOfWork(object):
 
     def register_dirty(self, document: Document, keys: Set[str]) -> None:
         '''Ставит документ в очередь для обновления.'''
+        logger.debug('Register dirty document %s with keys %s', document, keys)
         id_ = document.id
         if id_ is None:
             raise ValueError('Документ должен содержать ИД.')
@@ -52,9 +55,11 @@ class UnitOfWork(object):
                 self._dirty[id_][1].update(keys)
             else:
                 self._dirty[id_] = (document, keys)
+            logger.debug('Now dirty keys: %s', self._dirty[id_][1])
 
     def register_removed(self, document: Document) -> None:
         '''Ставит документ в очередь для удаления из БД.'''
+        logger.debug('Mark document %s to remove')
         id_ = document.id
         if id_ is None:
             raise ValueError('Документ должен содержать ИД.')

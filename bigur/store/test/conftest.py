@@ -14,8 +14,9 @@ from bigur.store.database import db
 @fixture
 def debug(caplog):
     '''Отладка тестов.'''
-    from logging import DEBUG
-    caplog.set_level(DEBUG, logger='bigur.store')
+    from logging import getLogger, DEBUG
+    caplog.set_level(DEBUG)
+    return getLogger(__name__).debug
 
 
 @fixture

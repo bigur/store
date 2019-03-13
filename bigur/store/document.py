@@ -1,34 +1,32 @@
-'''Документ данных.'''
+'''Database document.'''
 
 __author__ = 'Gennady Kovalev <gik@bigur.ru>'
 __copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import import_module
 from logging import getLogger
 from sys import modules
 from typing import Dict, Any, Set, Optional, List, TypeVar, Iterable
-from uuid import uuid4
 
-from bson.dbref import DBRef
+from bson import DBRef, ObjectId
 from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
-from bigur.store.typing import Id, Document as DocumentType
+from bigur.store.typing import Document as DocumentType
 from bigur.store.database import DBProxy, Collection, Cursor
 from bigur.store.database import db
 from bigur.store.lazy_ref import LazyRef
 from bigur.store.unit_of_work import context
 
-
-logger = getLogger('bigur.store.document')
-
+logger = getLogger(__name__)
 
 T = TypeVar('T')
 
 
 def pickle(obj: Any) -> Any:
-    '''Преобразования объекта в документ MongoDB.'''
+    '''Transform object to MongoDB document.'''
     pickled: Any
 
     if isinstance(obj, (str, int, float, bool, bytes)):
@@ -61,7 +59,7 @@ def pickle(obj: Any) -> Any:
 
 
 def unpickle(obj: Any) -> Any:
-    '''Преобразования объекта MongoDB в документ.'''
+    '''Transform MongoDB document to object.'''
     unpickled = obj
 
     if isinstance(obj, datetime) and obj.tzinfo is None:
@@ -95,17 +93,18 @@ def unpickle(obj: Any) -> Any:
     return unpickled
 
 
-class Node(object):
-    '''Узел для поддержки вложенности документов.'''
-    def __init__(self) -> None:
+@dataclass(init=False)
+class Node:
+    '''Abstract node for recursivity support.'''
+
+    def __post_init__(self) -> None:
         logger.debug('Node.__init__ (%s) start', self)
         self.__node_parent__: Optional[Document] = None
         self.__node_name__: Optional[str] = None
-        super().__init__()
         logger.debug('Node.__init__ (%s) end', self)
 
     def mark_dirty(self, keys: Set[str]) -> None:
-        '''Помечает корневой объект как грязный.'''
+        '''Mark root node as dirty.'''
         parent = getattr(self, '__node_parent__', None)
         if parent is not None:
             name = self.__node_name__
@@ -113,22 +112,25 @@ class Node(object):
             parent.mark_dirty(parent_keys)
 
 
+@dataclass(init=False)
 class EmbeddedList(Node, List[T]):
-    '''Список, который является свойством документа БД.'''
-    def __init__(self, iterable: Iterable = ()) -> None:
+    '''List that stored in database'''
+
+    def __post_init__(self, iterable: Iterable = ()) -> None:
         # pylint: disable=E1003
         super(EmbeddedList, self).__init__()
         super(Node, self).__init__(iterable)  # type: ignore
 
 
+@dataclass(init=False)
 class EmbeddedDict(Node, Dict[str, Any]):
-    '''Словарь, который является свойством документа БД.'''
+    '''Dict that stored in database'''
 
 
+@dataclass(init=False)
 class Document(DocumentType, Node):
-    '''Абстрактный документ базы данных.'''
+    '''Abstract database document.'''
 
-    # Изменение состояния объекта
     def __getstate__(self) -> Dict[str, Any]:
         metadata = type(self).__metadata__
         include = metadata.get('include_attrs', [])
@@ -170,7 +172,6 @@ class Document(DocumentType, Node):
 
         self.__dict__.update(state)
 
-    # Установка атрибутов
     def __setattr__(self, key: str, value: Any) -> None:
         logger.debug('Document.__setattr__ (%s) set %s=%s', self, key, value)
 
@@ -190,32 +191,32 @@ class Document(DocumentType, Node):
             return self.__dict__[key]
 
 
+@dataclass(init=False)
 class Embedded(Document):
-    '''Объект, который является встроенным документом в другой.'''
+    '''Embedded database document.'''
 
 
+@dataclass
 class Stored(Document):
-    '''Объект, который сохраняется в базу данных.'''
+    '''Root database document.'''
 
-    def __init__(self, id_: Optional[Id] = None) -> None:
-        logger.debug('Stored.__init__ (%s) start', self)
+    def __post_init__(self, id_: Optional[ObjectId] = None) -> None:
+        logger.debug('Stored.__post_init__ (%s) start', self)
         if id_ is None:
-            id_ = Id(str(uuid4()))
-        self._id: Id = id_
+            id_ = ObjectId()
+        self._id: ObjectId = id_
 
         self.mark_new()
 
         self.__unit_of_work__ = context.get()
 
-        super().__init__()
-        logger.debug('Stored.__init__ (%s) end', self)
+        super().__post_init__()
+        logger.debug('Stored.__post_init__ (%s) end', self)
 
     @property
     def id(self):
-        '''Возвращает идентификатор объекта, хранящийся в `self._id`.'''
         return self._id
 
-    # Установка атрибутов
     def __setattr__(self, key: str, value: Any):
         logger.debug('Stored.__setattr__ (%s) set %s=%s', self, key, value)
         super().__setattr__(key, value)
@@ -227,33 +228,30 @@ class Stored(Document):
 
     # Регистрация объектов в UnitOfWork
     def mark_new(self) -> None:
-        '''Помечает объект как новый в единице работы.'''
+        '''Mark object as new.'''
         uow = context.get()
         if uow is not None:
-            logger.debug('Помечаю объект %s как новый', self)
+            logger.debug('Mark object %s as new', self)
             uow.register_new(self)
         else:
-            logger.warning('Создаю объект вне контекста БД.', stack_info=True)
+            logger.warning(
+                'Creating object without db context.', stack_info=True)
 
     def mark_dirty(self, keys: Set[str]) -> None:
-        '''Помечает объект как изменённый в единице работы.'''
+        '''Mark object as dirty.'''
         if getattr(self, '_id', None) is not None:
-            logger.debug(
-                'Помечаю объект %s как грязный, атрибуты %s',
-                self,
-                ','.join(keys)
-            )
             uow = context.get()
             if uow is not None:
                 uow.register_dirty(self, keys)
             else:
                 logger.warning(
-                    'Изменяю объект вне контекста БД.', stack_info=True)
+                    'Changing object without database context.',
+                    stack_info=True)
 
     def mark_removed(self) -> None:
-        '''Помечает объект как удалённый в единице работы.'''
+        '''Mark document for removal.'''
         if getattr(self, '_id', None) is not None:
-            logger.debug('Помечаю объект %s как удалённый', self)
+            logger.debug('Marking object %s for deletion', self)
             uow = context.get()
             if uow is not None:
                 uow.register_removed(self)
@@ -295,7 +293,8 @@ class Stored(Document):
         return await collection.insert_one(state)
 
     @classmethod
-    async def update_one(cls, document: 'Stored',
+    async def update_one(cls,
+                         document: 'Stored',
                          keys: Optional[Set[str]] = None) -> UpdateResult:
         '''Обновляет документ в базу данных. Если указаны keys, то
         обновление происходит через `update_one`, иначе через
