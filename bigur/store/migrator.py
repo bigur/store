@@ -8,12 +8,9 @@ from datetime import datetime
 from logging import getLogger
 from re import sub
 from typing import Callable, Dict, List
-from urllib.parse import urlparse
 from uuid import uuid4
 
-from motor.motor_asyncio import AsyncIOMotorClient
 from bigur.rx import ObserverBase
-from bigur.utils import config, localzone
 
 logger = getLogger(__name__)
 
@@ -131,24 +128,24 @@ class Migrator(ObserverBase):
         for to_version, meth in path:
             logger.debug('Обновляю БД до версии %s для компоненты %s',
                          to_version, self.component)
-            uri = config.get(db._section, db._param, fallback=db._fallback)
-            db_name = urlparse(uri).path.strip('/')
-            direct_db = AsyncIOMotorClient(uri)[db_name]
-            await meth(direct_db)
+
+            orig_db = db.client.get_database(db.name)
+            await meth(orig_db)
+
             if db_version is None:
                 db_version = {
                     '_id': str(uuid4()),
                     'component': self.component,
                     'version': to_version,
-                    'timestamp': datetime.now(tz=localzone)
+                    'timestamp': datetime.utcnow()
                 }
-                await db.versions.insert_one(db_version)
+                await orig_db.versions.insert_one(db_version)
             else:
-                await db.versions.update_one({
+                await orig_db.versions.update_one({
                     '_id': db_version['_id']
                 }, {
                     '$set': {
-                        'timestamp': datetime.now(tz=localzone),
+                        'timestamp': datetime.utcnow(),
                         'version': to_version
                     }
                 })
