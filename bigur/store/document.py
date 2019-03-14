@@ -15,7 +15,7 @@ from bson import DBRef, ObjectId
 from pymongo.results import InsertOneResult, UpdateResult, DeleteResult
 
 from bigur.store.typing import Document as DocumentType
-from bigur.store.database import DBProxy, Collection, Cursor
+from bigur.store.database import Collection, Cursor
 from bigur.store.database import db
 from bigur.store.lazy_ref import LazyRef
 from bigur.store.unit_of_work import context
@@ -256,21 +256,14 @@ class Stored(Document):
             if uow is not None:
                 uow.register_removed(self)
 
-    # Коллекция
+    # Collection
     @classmethod
     def get_collection(cls) -> Collection:
-        '''Возвращает коллекцию MongoDB, отвечающую за данный класс.'''
-        meta = cls.__metadata__
-        if 'dbconfig' in meta:
-            dbase = DBProxy.get_for_config(meta['dbconfig']['section'],
-                                           meta['dbconfig']['param'])
-        else:
-            dbase = db
-
-        name = meta.get('collection')
+        '''Returns MongoDB collection for this class.'''
+        name = cls.__metadata__.get('collection')
         if name is None:
             name = str(cls.__name__).lower()
-        return dbase[name]
+        return db[name]
 
     # Запрос объектов из базы данных
     @classmethod
