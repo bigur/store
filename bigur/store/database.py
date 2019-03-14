@@ -5,7 +5,7 @@ __copyright__ = '(c) 2016-2018 Business group for development management'
 __licence__ = 'For license information see LICENSE'
 
 from importlib import import_module
-from typing import Dict, Union, Optional
+from typing import Union, Optional
 from sys import modules
 from urllib.parse import urlparse
 
@@ -13,11 +13,8 @@ from motor.core import AgnosticBaseProperties
 from motor.motor_asyncio import (AsyncIOMotorClient, AsyncIOMotorCursor,
                                  AsyncIOMotorDatabase, AsyncIOMotorCollection)
 
-from bigur.utils import config
-
 from bigur.store.typing import DatabaseDict, Document
 from bigur.store.unit_of_work import context
-
 
 DocumentOrObject = Union[Document, DatabaseDict]
 
@@ -93,44 +90,28 @@ class Cursor(AsyncIOMotorCursor):
 
 
 class DBProxy(object):
-
-    __cache__: Dict[str, 'DBProxy'] = {}
-
-    def __init__(self, section: str, param: str,
-                 fallback: Optional[str] = None) -> None:
-        self._section: str = section
-        self._param: str = param
-        self._fallback: Optional[str] = fallback
+    def __init__(self):
         self._db: Optional[Database] = None
 
-    @classmethod
-    def get_for_config(cls, section, param):
-        cache = cls.__cache__
-        cache_key = '{}-{}'.format(section, param)
-        if cache_key in cache:
-            proxy = cache[cache_key]
-        else:
-            cache[cache_key] = proxy = DBProxy(section, param)
-        return proxy
+    def configure(self, uri: str) -> None:
+        db_name = urlparse(uri).path.strip('/')
+        self._db = Client(uri)[db_name]
 
     @property
     def origin(self) -> Optional[Database]:
+        if self._db is None:
+            raise RuntimeError('Database is not configured')
         return self._db
-
-    def _configure(self) -> None:
-        url = config.get(self._section, self._param, fallback=self._fallback)
-        db_name = urlparse(url).path.strip('/')
-        self._db = Client(url)[db_name]
 
     def __getattr__(self, key):
         if self._db is None:
-            self._configure()
+            raise RuntimeError('Database is not configured')
         return getattr(self._db, key)
 
     def __getitem__(self, key):
         if self._db is None:
-            self._configure()
+            raise RuntimeError('Database is not configured')
         return self._db[key]
 
 
-db = DBProxy('general', 'database_url', 'mongodb://localhost/test')
+db = DBProxy()
