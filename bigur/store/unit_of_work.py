@@ -36,10 +36,11 @@ class UnitOfWork(object):
         id_ = document.id
         if id_ is None:
             raise ValueError('Документ должен содержать ИД.')
-        if id_ in self._dirty:
-            raise ValueError('Документ уже изменён и не сохранён.')
         if id_ in self._removed:
             raise ValueError('Документ помечен на удаление.')
+        if id_ in self._dirty:
+            # Document will be saved as new, so it can not be dirty
+            self._dirty.pop(id_)
         self._new[id_] = document
 
     def register_dirty(self, document: Document, keys: Set[str]) -> None:
