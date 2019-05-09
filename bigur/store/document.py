@@ -60,7 +60,8 @@ def pickle(obj: Any) -> Any:
 
 def unpickle(obj: Any) -> Any:
     '''Transform MongoDB document to object.'''
-    unpickled = obj
+
+    unpickled: Any
 
     if isinstance(obj, datetime) and obj.tzinfo is None:
         unpickled = obj.replace(tzinfo=timezone.utc)
@@ -89,6 +90,9 @@ def unpickle(obj: Any) -> Any:
 
     elif isinstance(obj, DBRef):
         unpickled = LazyRef(obj)
+
+    else:
+        unpickled = obj
 
     return unpickled
 
@@ -166,9 +170,13 @@ class Document(DocumentType, Node):
             if key in replaced:
                 key = replaced[key]
             if key in picklers:
-                state[key] = picklers[key]['unpickle'](self, state, value)
+                obj = picklers[key]['unpickle'](self, state, value)
             else:
-                state[key] = unpickle(value)
+                obj = unpickle(value)
+            state[key] = obj
+            if isinstance(obj, Node):
+                obj.__node_parent__ = self
+                obj.__node_name__ = key
 
         self.__dict__.update(state)
 
