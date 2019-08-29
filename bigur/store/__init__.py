@@ -9,5 +9,5 @@ __licence__ = 'For license information see LICENSE'
 from .database import db
 from .document import EmbeddedList, EmbeddedDict, Embedded, Stored
 from .lazy_ref import LazyRef
-from .migrator import Migrator, transition
+from .migrator import migrate, transition
 from .unit_of_work import UnitOfWork
