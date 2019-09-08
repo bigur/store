@@ -74,7 +74,7 @@ class Collection(AsyncIOMotorCollection):
 
     async def count_documents(self, *args, **kwargs) -> int:
         '''Получение числа документов, которое будет возвращенго запросом.'''
-        return await super().count(*args, **kwargs)
+        return await super().count_documents(*args, **kwargs)
 
     def find(self, *args, **kwargs) -> 'Cursor':
         '''Возвращает :class:`~.Cursor` для итерации.'''
